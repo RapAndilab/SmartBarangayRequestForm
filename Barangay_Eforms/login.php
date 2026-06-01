@@ -24,6 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode($response, true);
     
     if (isset($data['error'])) {
+        // Unverified accounts get sent to the email verification page.
+        if (!empty($data['verification_required'])) {
+            header("Location: verify_email.php?username=" . urlencode($data['username'] ?? $username));
+            exit();
+        }
         $error = $data['error'];
     } else {
         $_SESSION['user_id'] = $data['user_id'];
@@ -221,6 +226,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-container">
         <h1>Barangay E-Form Request</h1>
         <h2>Login</h2>
+
+        <?php if (isset($_GET['verified'])): ?>
+            <p style="color:#1e7e34; font-weight:bold;">Email verified! You can now log in.</p>
+        <?php endif; ?>
 
         <?php if ($error): ?>
             <p class="error-message"><?= $error ?></p>

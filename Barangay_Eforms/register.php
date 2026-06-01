@@ -30,9 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     else if (!preg_match('/^[A-Za-z0-9_]+$/', $_POST['username'])) {
         $error = "Username can only contain letters, numbers, and underscores.";
     }
-    else if (!isset($_FILES['profile_image'])) {
-        $error = "Your face is needed to proceed, take a picture";
-    }
     else {
         $data = '';
         foreach ($fields as $name => $value) {
@@ -64,7 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = json_decode($response, true);
             if (isset($result['id'])) {
-                $success = "Account created successfully!";
+                // Account created (unverified) — send user to enter the email code.
+                header("Location: verify_email.php?username=" . urlencode($_POST['username']));
+                exit;
             } elseif (isset($result['error'])) {
                 $error = $result['error'];
             } else {
@@ -259,9 +258,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
         
-        <!-- Profile Picture Upload -->
+        <!-- Profile Picture Upload (optional) -->
         <div style="margin-top: 10px;">
-            <label>Profile Picture:</label>
+            <label>Profile Picture (optional):</label>
             <br />
             <video id="video" width="320" height="240" autoplay></video>
             <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
@@ -287,12 +286,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const snapBtn = document.getElementById('snap');
     const photo = document.getElementById('photo');
 
-    // Get access to the webcam
+    // Get access to the webcam (optional — registration works without it)
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-        video.srcObject = stream;
-        video.play();
-    });
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+            video.play();
+        }).catch(() => {
+            // No camera / permission denied — hide the capture UI, photo is optional.
+            if (video) video.style.display = 'none';
+            if (snapBtn) snapBtn.style.display = 'none';
+        });
+    } else {
+        if (video) video.style.display = 'none';
+        if (snapBtn) snapBtn.style.display = 'none';
     }
 
     function dataURLtoFile(dataurl, filename) {

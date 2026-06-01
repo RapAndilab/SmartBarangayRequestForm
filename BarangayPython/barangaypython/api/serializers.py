@@ -28,6 +28,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
 
         user = CustomUser(**validated_data)
+        user.is_verified = False  # must confirm email before logging in
 
         if image:
             # Extract extension

@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from django.core.mail import send_mail
 import requests
 from requests.auth import HTTPBasicAuth
@@ -22,6 +23,34 @@ from api.utils import generate_document_file
 
 from .serializers import CustomUserSerializer, DocumentRequestSerializer
 
+# EMAIL VERIFICATION
+OTP_TTL = timedelta(minutes=10)
+
+
+def send_email_otp(user):
+    """Generate a fresh 6-digit code, store it, and email it to the user."""
+    code = f"{secrets.randbelow(1000000):06d}"
+    user.email_otp = code
+    user.email_otp_created_at = timezone.now()
+    user.save(update_fields=["email_otp", "email_otp_created_at"])
+
+    if user.email:
+        try:
+            send_mail(
+                subject="Your Barangay E-Form verification code",
+                message=(
+                    f"Hi {user.first_name},\n\n"
+                    f"Your verification code is: {code}\n\n"
+                    f"It expires in 10 minutes.\n"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+            )
+        except Exception as e:
+            print("OTP email error:", e)
+    return code
+
+
 # USER AUTHENTICATION
 class UserCreateView(views.APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -29,9 +58,51 @@ class UserCreateView(views.APIView):
     def post(self, request):
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            user = serializer.save()
+            send_email_otp(user)
+            return Response(
+                {**serializer.data, "verification_required": True},
+                status=status.HTTP_201_CREATED,
+            )
         return Response(serializer.errors, status=status.HTTP_200_OK)
+
+
+class VerifyEmailView(views.APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        otp = request.data.get("otp")
+        try:
+            user = CustomUser.objects.get(username=username)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_200_OK)
+
+        if user.is_verified:
+            return Response({"message": "Email already verified"}, status=status.HTTP_200_OK)
+        if not user.email_otp or user.email_otp != otp:
+            return Response({"error": "Invalid verification code"}, status=status.HTTP_200_OK)
+        if not user.email_otp_created_at or timezone.now() - user.email_otp_created_at > OTP_TTL:
+            return Response({"error": "Code expired. Please request a new one."}, status=status.HTTP_200_OK)
+
+        user.is_verified = True
+        user.email_otp = None
+        user.email_otp_created_at = None
+        user.save(update_fields=["is_verified", "email_otp", "email_otp_created_at"])
+        return Response({"message": "Email verified. You can now log in."}, status=status.HTTP_200_OK)
+
+
+class ResendOtpView(views.APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        try:
+            user = CustomUser.objects.get(username=username)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_200_OK)
+
+        if user.is_verified:
+            return Response({"message": "Email already verified"}, status=status.HTTP_200_OK)
+
+        send_email_otp(user)
+        return Response({"message": "A new code has been sent to your email."}, status=status.HTTP_200_OK)
 
 class UserLoginView(views.APIView):
     def post(self, request):
@@ -43,6 +114,13 @@ class UserLoginView(views.APIView):
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            if not user.is_verified:
+                return Response(
+                    {"error": "Please verify your email before logging in.",
+                     "verification_required": True,
+                     "username": user.username},
+                    status=status.HTTP_200_OK,
+                )
             login(request, user)  # Django session login
             return Response({
                 "message": "Login successful",

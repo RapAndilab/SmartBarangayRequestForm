@@ -6,6 +6,13 @@ A barangay document-request system with two parts:
   document requests, admin approval, email + SMS notifications, and document generation.
 - **`Barangay_Eforms/`** — PHP web frontend that calls the Django API.
 
+## Registration flow
+
+1. A visitor fills out the registration form (profile photo is **optional**).
+2. The account is created as **unverified** and a **6-digit code** is emailed to them.
+3. They enter the code on the verify page (10-minute expiry, with a "resend" option).
+4. Once verified, they can log in. **Login is blocked until the email is verified.**
+
 ## Document request flow
 
 1. A logged-in resident fills out a document form (Clearance / Certification / Residency).

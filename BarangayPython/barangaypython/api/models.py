@@ -9,6 +9,12 @@ class CustomUser(AbstractUser):
     phone = models.CharField(max_length=20)
     image = models.ImageField(upload_to='user_images/', blank=True, null=True)
 
+    # Email verification (default True so existing/admin-created users aren't locked
+    # out; new registrations are explicitly set to False until they enter the code).
+    is_verified = models.BooleanField(default=True)
+    email_otp = models.CharField(max_length=6, blank=True, null=True)
+    email_otp_created_at = models.DateTimeField(blank=True, null=True)
+
 class UserDocumentRequest(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     document_type = models.CharField(max_length=100)
