@@ -49,8 +49,8 @@ if (isset($response_data['error'])) {
     die("Error: " . htmlspecialchars($response_data['error']));
 }
 
-$request_id = $response_data['request_id'];  
-// Redirect or render payment upload page with $request_id for reference
-echo json_encode(["redirect" => "process_payment.php?request_id=$request_id"]);
+$request_id = $response_data['request_id'];
+// Request created as pending — send the user to the confirmation page.
+echo json_encode(["redirect" => "request_submitted.php?request_id=$request_id"]);
 exit;
 ?>

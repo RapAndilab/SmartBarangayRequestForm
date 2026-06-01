@@ -10,10 +10,7 @@ services:
   - type: web
     name: smartbarangay
     runtime: python
-    # NOTE: this app loads TensorFlow (via deepface) for face verification, which
-    # needs ~2 GB RAM. Render's free/starter tiers (512 MB) will crash with OOM.
-    # The "standard" plan (2 GB) is the smallest that can run it.
-    plan: standard
+    plan: free
     rootDir: BarangayPython/barangaypython
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
     startCommand: "gunicorn core.wsgi:application"

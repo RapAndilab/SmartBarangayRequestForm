@@ -15,8 +15,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from django.core.files.storage import default_storage
-
-from deepface import DeepFace
+from django.http import FileResponse, Http404
 
 from api.models import CustomUser, UserDocumentRequest
 from api.utils import generate_document_file
@@ -74,43 +73,33 @@ class GetProfileImageView(views.APIView):
             return Response({"image_url": f"{settings.MEDIA_URL}{user.image.name}"})
         return Response({"error": "No profile image"}, status=status.HTTP_200_OK)
 
-# FACE RECOGNITION
-class VerifyFaceView(views.APIView):
-    def post(self, request):
-        uploaded_image = request.FILES['captured_face']
-        temp_path = default_storage.save("temp_uploaded.jpg", uploaded_image)
-        temp_full_path = default_storage.path(temp_path)
-
+# DOCUMENT DOWNLOAD (gated on admin approval)
+class DownloadDocumentView(views.APIView):
+    """Serve a generated document file only after the request is approved."""
+    def get(self, request, request_id):
         try:
-            # Loop through saved user images
-            for user in CustomUser.objects.exclude(image=''):
-                user_image_path = user.image.path
-                try:
-                    # DeepFace verify returns a dict with 'verified': True/False
-                    result = DeepFace.verify(
-                        img1_path=temp_full_path,
-                        img2_path=user_image_path,
-                        model_name="VGG-Face",  # Options: "Facenet", "ArcFace", etc.
-                        enforce_detection=True  # Will throw error if no face found
-                    )
-                    
-                    if result.get("verified", False):
-                        return Response(
-                            {"match": f"{user.first_name} {user.last_name}"},
-                            status=status.HTTP_200_OK
-                        )
-                except Exception as e:
-                    # Skip if face not detected in one of the images
-                    continue
-                
-            return Response({"match": None}, status=status.HTTP_200_OK)
+            doc_request = UserDocumentRequest.objects.get(id=request_id)
+        except UserDocumentRequest.DoesNotExist:
+            raise Http404("Request not found")
 
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        finally:
-            # Clean up temp file
-            if os.path.exists(temp_full_path):
-                os.remove(temp_full_path)
+        if not doc_request.confirmed:
+            return Response(
+                {"error": "This request has not been approved yet."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not doc_request.download_link:
+            raise Http404("No document available for this request")
+
+        # download_link looks like "/media/generated_xxx.docx" -> resolve to a real path
+        filename = os.path.basename(doc_request.download_link)
+        file_path = os.path.join(settings.MEDIA_ROOT, filename)
+        if not os.path.exists(file_path):
+            raise Http404("Document file is no longer available")
+
+        return FileResponse(
+            open(file_path, "rb"), as_attachment=True, filename=filename
+        )
 
 # DOCUMENT REQUEST
 class DocumentRequestCreateView(views.APIView):
@@ -235,6 +224,31 @@ class DocumentProcessRequestView(views.APIView):
         serializer = DocumentRequestSerializer(doc_request)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+def approve_document_request(doc_req):
+    """Mark a request approved and email the user. Shared by the API and Django admin."""
+    doc_req.confirmed = True
+    doc_req.confirmed_at = timezone.now()
+    doc_req.save()
+
+    # -EMAIL NOTIFICATION TO USER-
+    if doc_req.user.email:
+        try:
+            send_mail(
+                subject="Your document request has been approved",
+                message=(
+                    f"Hi '{doc_req.user.first_name} {doc_req.user.last_name}',\n\n"
+                    f"Your request for '{doc_req.document_type}' "
+                    f"has been approved.\n\n"
+                    f"You may now download your document.\n"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[doc_req.user.email]
+            )
+        except Exception as e:
+            print("Email error:", e)
+    # ------------------------------------------------------------
+
+
 class DocumentConfirmRequestView(views.APIView):
     def post(self, request):
         try:
@@ -242,27 +256,6 @@ class DocumentConfirmRequestView(views.APIView):
         except UserDocumentRequest.DoesNotExist:
             return Response({"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        doc_req.confirmed = True
-        doc_req.confirmed_at = timezone.now()
-        doc_req.save()
-
-        # -EMAIL NOTIFICATION TO USER-
-        if doc_req.user.email:
-            try:
-                send_mail(
-                    subject="Your payment has been confirmed",
-                    message=(
-                        f"Hi '{doc_req.user.first_name} {doc_req.user.last_name}',\n\n"
-                        f"Your payment for '{doc_req.document_type}' "
-                        f"has been confirmed.\n\n"
-                        f"You may now download your document.\n"
-                    ),
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[doc_req.user.email]
-                )
-            except Exception as e:
-                print("Email error:", e)
-        # ------------------------------------------------------------
-
-        return Response({"message": "Payment confirmed and download link updated."})
+        approve_document_request(doc_req)
+        return Response({"message": "Request approved and download link unlocked."})
 

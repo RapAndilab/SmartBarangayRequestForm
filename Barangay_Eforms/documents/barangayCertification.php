@@ -169,19 +169,11 @@ include '../header.php';
         <label>Purpose:</label>
         <textarea name="purpose" placeholder="e.g. Job Application, Travel, Government Requirement" required></textarea>
 
-        <div class="camera-section">
-            <h3>Facial Verification</h3>
-            <video id="video" autoplay playsinline></video>
-            <img id="facePreview" class="preview" style="display:none;" alt="Face Preview">
-            <button class="btn" type="button" id="captureBtn" onclick="captureFace()">Capture Face</button>
-            
-            <input type="file" name="captured_face" id="captured_face" style="display:none;" />
-        </div>
         
        
         
 
-        <button class="btn" id="submitBtn" type="submit" disabled>Submit Request</button>
+        <button class="btn" id="submitBtn" type="submit">Submit Request</button>
     </form>
 </div>
 
@@ -224,7 +216,7 @@ include '../header.php';
 
 
 <!-- This is where process document request is sent -->
-<script src="../utils/face_validator.js"></script>
+<script src="../utils/document_submit.js"></script>
 
 </body>
 </html>

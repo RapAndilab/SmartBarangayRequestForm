@@ -3,9 +3,16 @@
 A barangay document-request system with two parts:
 
 - **`BarangayPython/`** — Django REST API backend (the main app). Handles users,
-  document requests, face verification (DeepFace), email + SMS notifications, and
-  document generation.
+  document requests, admin approval, email + SMS notifications, and document generation.
 - **`Barangay_Eforms/`** — PHP web frontend that calls the Django API.
+
+## Document request flow
+
+1. A logged-in resident fills out a document form (Clearance / Certification / Residency).
+2. The request is created as **Pending** (`confirmed = False`).
+3. An admin reviews it in the Django admin (`/admin/`) and **approves** it.
+4. The resident is emailed and can then **download** the document. Downloads are blocked
+   (HTTP 403) until the request is approved.
 
 ## Running the Django backend locally
 
@@ -34,38 +41,24 @@ API to be running at `http://127.0.0.1:8000`.
 
 ---
 
-## ⚠️ Deployment notes (please read before deploying to Vercel)
-
-Vercel is a **serverless/static** host, and this Django app does not fit that model
-well as-is. Two hard blockers:
-
-1. **Size:** The app imports `deepface`, which depends on **TensorFlow (~600 MB+)**.
-   Vercel serverless functions have a **250 MB unzipped** limit, so the build will
-   fail. To deploy on Vercel you'd have to remove face verification or move it to a
-   separate service.
-2. **Database & files:** Vercel's filesystem is **read-only and ephemeral**, so
-   `db.sqlite3` and uploaded media/documents won't persist. You'd need an external
-   database (e.g. Postgres on Neon/Supabase) and object storage (e.g. S3).
-
-A `vercel.json` is included under `BarangayPython/barangaypython/` for completeness
-(set the Vercel **Root Directory** to that folder), but expect the TensorFlow size
-limit to block it.
-
-### Deploying to Render (recommended)
+## Deploying to Render
 
 A `render.yaml` blueprint is included at the repo root. It provisions a Postgres
-database and a Python web service running gunicorn.
+database and a Python web service running gunicorn — and it runs on Render's **free
+tier** (the app no longer bundles TensorFlow).
 
-1. Push this repo to GitHub (already done).
+1. Push this repo to GitHub.
 2. On https://dashboard.render.com → **New +** → **Blueprint**, and select this repo.
-3. Render reads `render.yaml` and creates the database + web service.
+3. Render reads `render.yaml` and creates the database + web service. Click **Apply**.
 4. After the first deploy, open the web service → **Environment** tab and fill in the
    secret values (email, SMS, etc.) listed in `.env.example`. `DATABASE_URL` and
    `DJANGO_SECRET_KEY` are wired up automatically.
-5. Create an admin user from the Render **Shell**: `python manage.py createsuperuser`
+5. Create an admin user from the Render **Shell**: `python manage.py createsuperuser`,
+   then approve requests at `https://<your-app>.onrender.com/admin/`.
 
-**Important — plan size:** This app loads TensorFlow (for DeepFace face verification),
-which needs roughly **2 GB RAM**. Render's free/starter tiers (512 MB) will crash with
-an out-of-memory error, so `render.yaml` uses the **Standard** plan. If you don't need
-face verification, removing the `deepface`/`tensorflow` dependency would let it run on a
-much smaller (even free) instance.
+### Known limitation — file storage
+
+On Render's **free tier the disk is ephemeral**, so generated `.docx` files and uploaded
+images are lost on restart/redeploy. This is fine for a demo or testing. For real
+production, add object storage (e.g. Amazon S3 via `django-storages`) so documents
+persist.

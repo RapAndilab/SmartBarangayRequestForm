@@ -14,7 +14,7 @@ class UserDocumentRequest(models.Model):
     document_type = models.CharField(max_length=100)
     full_name=models.CharField(max_length=100)
 
-    payment_screenshot = models.ImageField(upload_to='payment_screenshots/')
+    payment_screenshot = models.ImageField(upload_to='payment_screenshots/', blank=True, null=True)
     confirmed = models.BooleanField(default=False)
     download_link = models.CharField(max_length=100, blank=True, null=True)
     requested_at = models.DateTimeField(auto_now_add=True)

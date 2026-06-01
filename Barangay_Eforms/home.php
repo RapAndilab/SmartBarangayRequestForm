@@ -164,24 +164,19 @@ $requests = getUserDocumentRequests($user_id);
         <tbody>
             <?php if (!empty($requests)): ?>
                 <?php foreach ($requests as $req): ?>
-                    <tr 
-                        onclick="window.location.href='documents/process_payment.php?request_id=<?= $req['id'] ?>'"
-                        style="cursor: pointer;"
-                    >
+                    <tr>
                         <td><?= htmlspecialchars($req['id']) ?></td>
                         <td><?= htmlspecialchars($req['document_type']) ?></td>
                         <td>
                             <?php if ($req['confirmed']): ?>
-                                <span style="color:green;">Confirmed ✅</span>
-                            <?php elseif (empty($req['payment_screenshot'])): ?>
-                                <span style="color:orange;">Waiting for Payment Screenshot</span>
+                                <span style="color:green;">Approved ✅</span>
                             <?php else: ?>
-                                <span style="color:red;">Awaiting Payment Confirmation ⏳</span>
+                                <span style="color:orange;">Pending Approval ⏳</span>
                             <?php endif; ?>
                         </td>
                         <td>
                             <?php if ($req['confirmed'] && !empty($req['download_link'])): ?>
-                                <a href="http://127.0.0.1:8000<?= $req['download_link'] ?>" download>📥 Download</a>
+                                <a href="http://127.0.0.1:8000/api/download/<?= $req['id'] ?>/" download>📥 Download</a>
                             <?php else: ?>
                                 N/A
                             <?php endif; ?>
