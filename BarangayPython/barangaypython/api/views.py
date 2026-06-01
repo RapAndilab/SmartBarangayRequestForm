@@ -57,11 +57,15 @@ class UserCreateView(views.APIView):
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            send_email_otp(user)
-            return Response(
-                {**serializer.data, "verification_required": True},
-                status=status.HTTP_201_CREATED,
-            )
+            if settings.EMAIL_VERIFICATION_ENABLED:
+                send_email_otp(user)
+                return Response(
+                    {**serializer.data, "verification_required": True},
+                    status=status.HTTP_201_CREATED,
+                )
+            user.is_verified = True
+            user.save(update_fields=["is_verified"])
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_200_OK)
 
 
@@ -112,7 +116,7 @@ class UserLoginView(views.APIView):
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
-            if not user.is_verified:
+            if settings.EMAIL_VERIFICATION_ENABLED and not user.is_verified:
                 return Response(
                     {"error": "Please verify your email before logging in.",
                      "verification_required": True,

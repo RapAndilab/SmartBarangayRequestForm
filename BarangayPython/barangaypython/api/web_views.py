@@ -5,6 +5,7 @@ but render Django templates and use Django's session auth.
 """
 from datetime import datetime
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -61,7 +62,8 @@ def register(request):
             address=data.get("address", ""),
             phone=data.get("phone", ""),
         )
-        user.is_verified = False
+        # Auto-verify unless email verification is enabled.
+        user.is_verified = not settings.EMAIL_VERIFICATION_ENABLED
         if image:
             ext = image.name.split(".")[-1]
             image.name = f"{username.lower()}.{ext}"
@@ -69,10 +71,14 @@ def register(request):
         user.set_password(password)
         user.save()
 
-        send_email_otp(user)
-        request.session["pending_username"] = username
-        messages.success(request, "Account created! We emailed you a 6-digit verification code.")
-        return redirect("web_verify")
+        if settings.EMAIL_VERIFICATION_ENABLED:
+            send_email_otp(user)
+            request.session["pending_username"] = username
+            messages.success(request, "Account created! We emailed you a 6-digit verification code.")
+            return redirect("web_verify")
+
+        messages.success(request, "Account created! You can now log in.")
+        return redirect("web_login")
 
     return render(request, "web/register.html", {"data": {}, "genders": ["Male", "Female"]})
 
@@ -123,7 +129,7 @@ def login_view(request):
 
         if user is None:
             messages.error(request, "Invalid username or password.")
-        elif not user.is_verified:
+        elif settings.EMAIL_VERIFICATION_ENABLED and not user.is_verified:
             send_email_otp(user)
             request.session["pending_username"] = user.username
             messages.error(request, "Please verify your email first. We sent you a new code.")

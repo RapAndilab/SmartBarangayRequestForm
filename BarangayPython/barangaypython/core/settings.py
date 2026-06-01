@@ -184,6 +184,11 @@ EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
 
+# Email OTP verification. Disabled by default because Render's free tier blocks
+# outbound SMTP. Set EMAIL_VERIFICATION_ENABLED=True once an HTTP email provider
+# is configured to require email confirmation again.
+EMAIL_VERIFICATION_ENABLED = os.environ.get('EMAIL_VERIFICATION_ENABLED', 'False') == 'True'
+
 # Auth redirects for the server-rendered resident site
 LOGIN_URL = 'web_login'
 LOGIN_REDIRECT_URL = 'web_home'
