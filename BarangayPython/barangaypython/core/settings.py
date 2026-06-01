@@ -180,3 +180,8 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
+
+# Auth redirects for the server-rendered resident site
+LOGIN_URL = 'web_login'
+LOGIN_REDIRECT_URL = 'web_home'
+LOGOUT_REDIRECT_URL = 'web_login'

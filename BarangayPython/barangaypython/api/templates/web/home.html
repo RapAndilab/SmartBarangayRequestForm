@@ -1,0 +1,56 @@
+{% extends "web/base.html" %}
+{% block title %}Home - Barangay E-Form{% endblock %}
+{% block content %}
+{% if user.is_authenticated %}
+    <h1>Welcome, {{ user.first_name|default:user.username }}!</h1>
+    <p class="muted" style="text-align:center;">
+        Request a barangay document, then track its approval status below.
+    </p>
+    <p style="text-align:center;">
+        <a class="btn btn-link" href="{% url 'web_request' %}" style="max-width:260px;">+ Request a Document</a>
+    </p>
+
+    <h2 style="color:#0d3b66;">Your Document Requests</h2>
+    {% if requests %}
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Document</th><th>Status</th><th>Requested</th><th>Download</th></tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                    <tr>
+                        <td>{{ req.id }}</td>
+                        <td>{{ req.document_type|title }}</td>
+                        <td>
+                            {% if req.confirmed %}
+                                <span class="pill approved">Approved</span>
+                            {% else %}
+                                <span class="pill pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ req.requested_at|date:"M d, Y" }}</td>
+                        <td>
+                            {% if req.confirmed and req.download_link %}
+                                <a href="{% url 'download_document' req.id %}">📥 Download</a>
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="muted">You haven't requested any documents yet.</p>
+    {% endif %}
+{% else %}
+    <h1>Barangay E-Form Request System</h1>
+    <p class="muted" style="text-align:center;">
+        Request barangay clearance, certification, and residency documents online.
+    </p>
+    <p style="text-align:center;">
+        <a class="btn btn-link" href="{% url 'web_login' %}" style="max-width:240px;">Login</a>
+    </p>
+    <p style="text-align:center;">New here? <a href="{% url 'web_register' %}">Create an account</a></p>
+{% endif %}
+{% endblock %}

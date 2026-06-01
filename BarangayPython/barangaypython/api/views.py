@@ -158,6 +158,14 @@ class DownloadDocumentView(views.APIView):
         except UserDocumentRequest.DoesNotExist:
             raise Http404("Request not found")
 
+        # Only the owner (or staff) may download.
+        u = request.user
+        if not u.is_authenticated or (doc_request.user_id != u.id and not u.is_staff):
+            return Response(
+                {"error": "You are not allowed to download this document."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         if not doc_request.confirmed:
             return Response(
                 {"error": "This request has not been approved yet."},

@@ -1,0 +1,16 @@
+{% extends "web/base.html" %}
+{% block title %}Login - Barangay E-Form{% endblock %}
+{% block content %}
+<h1>Login</h1>
+<form method="POST">
+    {% csrf_token %}
+    <label>Username</label>
+    <input type="text" name="username" required autofocus>
+    <label>Password</label>
+    <input type="password" name="password" required>
+    <button class="btn" type="submit">Log in</button>
+</form>
+<p class="muted" style="text-align:center; margin-top:16px;">
+    Don't have an account? <a href="{% url 'web_register' %}">Register here</a>
+</p>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Barangay E-Form Request{% endblock %}</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #eef2f7;
+            min-height: 100vh; color: #222;
+        }
+        .topbar {
+            background: #0d3b66; color: #fff; padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .topbar .brand { display: flex; align-items: center; gap: 12px; font-weight: bold; font-size: 18px; }
+        .topbar .brand img { height: 40px; width: 40px; object-fit: contain; background:#fff; border-radius:50%; padding:2px; }
+        .topbar nav a { color: #fff; text-decoration: none; margin-left: 18px; font-size: 15px; }
+        .topbar nav a:hover { text-decoration: underline; }
+        .logo-row { display: flex; justify-content: center; gap: 24px; margin: 24px 0 8px; }
+        .logo-row img { height: 70px; width: 70px; object-fit: contain; }
+        .container {
+            background: #fff; max-width: 720px; margin: 20px auto 60px; padding: 32px;
+            border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+        h1 { color: #0d3b66; text-align: center; margin-top: 0; }
+        label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 14px; }
+        input, select, textarea {
+            width: 100%; padding: 11px; border: 1px solid #ccc; border-radius: 8px;
+            font-size: 15px; font-family: inherit;
+        }
+        textarea { min-height: 70px; resize: vertical; }
+        .btn {
+            width: 100%; padding: 13px; background: #0d3b66; color: #fff; border: none;
+            border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 18px;
+        }
+        .btn:hover { background: #09294a; }
+        .btn-link { display:inline-block; text-align:center; }
+        .msg { padding: 12px 14px; border-radius: 8px; margin: 10px 0; font-weight: 600; }
+        .msg.error { background: #fdecea; color: #c0392b; }
+        .msg.success { background: #e9f7ef; color: #1e7e34; }
+        .muted { color: #666; font-size: 14px; }
+        a { color: #0d3b66; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
+        th { background: #f3f6fa; color: #0d3b66; }
+        .pill { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+        .pill.approved { background: #e9f7ef; color: #1e7e34; }
+        .pill.pending { background: #fff4e5; color: #b9770e; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+        @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <div class="topbar">
+        <div class="brand">
+            <img src="{% static 'web/img/dapitanlogo.png' %}" alt="Logo">
+            <span>Barangay E-Form Request</span>
+        </div>
+        <nav>
+            {% if user.is_authenticated %}
+                <a href="{% url 'web_home' %}">Home</a>
+                <a href="{% url 'web_request' %}">Request Document</a>
+                <a href="{% url 'web_logout' %}">Logout ({{ user.username }})</a>
+            {% else %}
+                <a href="{% url 'web_login' %}">Login</a>
+                <a href="{% url 'web_register' %}">Register</a>
+            {% endif %}
+        </nav>
+    </div>
+
+    <div class="logo-row">
+        <img src="{% static 'web/img/dapitanlogo.png' %}" alt="City of Dapitan">
+        <img src="{% static 'web/img/jrmsulogo.png' %}" alt="JRMSU">
+        <img src="{% static 'web/img/coelogo.png' %}" alt="COE">
+    </div>
+
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="msg {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

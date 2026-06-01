@@ -1,0 +1,28 @@
+{% extends "web/base.html" %}
+{% block title %}Verify Email - Barangay E-Form{% endblock %}
+{% block content %}
+<h1>Verify Your Email</h1>
+<p class="muted" style="text-align:center;">
+    Enter the 6-digit code we sent to your email address to activate your account.
+</p>
+
+<form method="POST">
+    {% csrf_token %}
+    <input type="hidden" name="username" value="{{ username }}">
+    <input type="hidden" name="action" value="verify">
+    <label>Verification Code</label>
+    <input type="text" name="otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
+           placeholder="------" required autofocus
+           style="text-align:center; letter-spacing:8px; font-size:22px;">
+    <button class="btn" type="submit">Verify</button>
+</form>
+
+<form method="POST" style="margin-top:10px; text-align:center;">
+    {% csrf_token %}
+    <input type="hidden" name="username" value="{{ username }}">
+    <input type="hidden" name="action" value="resend">
+    <button type="submit" style="background:none; border:none; color:#0d3b66; text-decoration:underline; cursor:pointer;">
+        Didn't get a code? Resend
+    </button>
+</form>
+{% endblock %}

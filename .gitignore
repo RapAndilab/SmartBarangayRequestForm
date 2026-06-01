@@ -31,6 +31,9 @@ BarangayPython/barangaypython/staticfiles/
 # Vercel
 .vercel/
 
+# MS Office lock/temp files
+~$*
+
 # OS / editor
 .DS_Store
 Thumbs.db
