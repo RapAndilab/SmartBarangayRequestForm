@@ -12,9 +12,9 @@ services:
     runtime: python
     plan: free
     rootDir: BarangayPython/barangaypython
-    # createsuperuser runs non-interactively from DJANGO_SUPERUSER_* env vars; it is
-    # wrapped so it can't fail the build (e.g. on redeploys when the admin already exists).
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && (python manage.py createsuperuser --no-input || echo 'superuser already exists or vars not set — skipping')"
+    # ensure_admin creates/updates the admin from DJANGO_SUPERUSER_* env vars on every
+    # deploy (idempotent — also resets the password, so the login state is predictable).
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py ensure_admin"
     startCommand: "gunicorn core.wsgi:application"
     envVars:
       - key: PYTHON_VERSION
