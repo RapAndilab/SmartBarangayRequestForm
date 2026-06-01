@@ -180,10 +180,3 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
-
-# SMS
-LOCAL_SMS_URL = os.environ.get('LOCAL_SMS_URL', 'https://api.sms-gate.app:443/3rdparty/v1/message')
-USERNAME = os.environ.get('SMS_USERNAME', '')
-PASSWORD = os.environ.get('SMS_PASSWORD', '')
-
-ADMIN_PHONE_NUMBER = os.environ.get('ADMIN_PHONE_NUMBER', '')

@@ -3,7 +3,7 @@
 A barangay document-request system with two parts:
 
 - **`BarangayPython/`** — Django REST API backend (the main app). Handles users,
-  document requests, admin approval, email + SMS notifications, and document generation.
+  document requests, admin approval, email notifications, and document generation.
 - **`Barangay_Eforms/`** — PHP web frontend that calls the Django API.
 
 ## Registration flow
@@ -58,7 +58,7 @@ tier** (the app no longer bundles TensorFlow).
 2. On https://dashboard.render.com → **New +** → **Blueprint**, and select this repo.
 3. Render reads `render.yaml` and creates the database + web service. Click **Apply**.
 4. After the first deploy, open the web service → **Environment** tab and fill in the
-   secret values (email, SMS, etc.) listed in `.env.example`. `DATABASE_URL` and
+   secret values (email, etc.) listed in `.env.example`. `DATABASE_URL` and
    `DJANGO_SECRET_KEY` are wired up automatically.
 5. Create an admin user from the Render **Shell**: `python manage.py createsuperuser`,
    then approve requests at `https://<your-app>.onrender.com/admin/`.

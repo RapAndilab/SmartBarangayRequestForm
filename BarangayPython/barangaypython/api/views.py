@@ -2,8 +2,6 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from django.core.mail import send_mail
-import requests
-from requests.auth import HTTPBasicAuth
 
 from django.conf import settings
 
@@ -280,23 +278,6 @@ class DocumentProcessRequestView(views.APIView):
             )
         except Exception as e:
             print("Admin email error:", e)
-        # ------------------------------------------------------------
-
-        # -SMS NOTIFICATION-
-        print("Sending SMS")
-        try:
-            payload = {
-                    "textMessage": {"text": admin_message},
-                    "phoneNumbers": [settings.ADMIN_PHONE_NUMBER]
-                }
-            response = requests.post(
-                settings.LOCAL_SMS_URL,
-                json=payload,
-                auth=HTTPBasicAuth(settings.USERNAME, settings.PASSWORD)
-            )
-            print("SMS sent successfully")
-        except Exception as e:
-            print("Failed to send SMS:", response.text)
         # ------------------------------------------------------------
 
         serializer = DocumentRequestSerializer(doc_request)
