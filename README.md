@@ -51,8 +51,21 @@ A `vercel.json` is included under `BarangayPython/barangaypython/` for completen
 (set the Vercel **Root Directory** to that folder), but expect the TensorFlow size
 limit to block it.
 
-### Recommended alternative
+### Deploying to Render (recommended)
 
-For a Django app with TensorFlow + a database, use a host with a real server and
-persistent disk, such as **Render**, **Railway**, **Fly.io**, or **PythonAnywhere**.
-Set the same environment variables (from `.env.example`) in the host's dashboard.
+A `render.yaml` blueprint is included at the repo root. It provisions a Postgres
+database and a Python web service running gunicorn.
+
+1. Push this repo to GitHub (already done).
+2. On https://dashboard.render.com → **New +** → **Blueprint**, and select this repo.
+3. Render reads `render.yaml` and creates the database + web service.
+4. After the first deploy, open the web service → **Environment** tab and fill in the
+   secret values (email, SMS, etc.) listed in `.env.example`. `DATABASE_URL` and
+   `DJANGO_SECRET_KEY` are wired up automatically.
+5. Create an admin user from the Render **Shell**: `python manage.py createsuperuser`
+
+**Important — plan size:** This app loads TensorFlow (for DeepFace face verification),
+which needs roughly **2 GB RAM**. Render's free/starter tiers (512 MB) will crash with
+an out-of-memory error, so `render.yaml` uses the **Standard** plan. If you don't need
+face verification, removing the `deepface`/`tensorflow` dependency would let it run on a
+much smaller (even free) instance.
