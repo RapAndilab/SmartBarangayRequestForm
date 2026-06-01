@@ -19,17 +19,17 @@
             <tbody>
                 {% for req in requests %}
                     <tr>
-                        <td>{{ req.id }}</td>
-                        <td>{{ req.document_type|title }}</td>
-                        <td>
+                        <td data-label="ID">{{ req.id }}</td>
+                        <td data-label="Document">{{ req.document_type|title }}</td>
+                        <td data-label="Status">
                             {% if req.confirmed %}
                                 <span class="pill approved">Approved</span>
                             {% else %}
                                 <span class="pill pending">Pending</span>
                             {% endif %}
                         </td>
-                        <td>{{ req.requested_at|date:"M d, Y" }}</td>
-                        <td>
+                        <td data-label="Requested">{{ req.requested_at|date:"M d, Y" }}</td>
+                        <td data-label="Download">
                             {% if req.confirmed and req.download_link %}
                                 <a href="{% url 'download_document' req.id %}">📥 Download</a>
                             {% else %}
