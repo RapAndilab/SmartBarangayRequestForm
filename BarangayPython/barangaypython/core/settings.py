@@ -178,6 +178,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# Fail fast if the SMTP port is blocked (e.g. on Render), so a hung connection
+# can't run past gunicorn's worker timeout and crash the request with a 500.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
 
