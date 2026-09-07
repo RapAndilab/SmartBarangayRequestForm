@@ -51,9 +51,6 @@ def generate_document_file(data: dict) -> str:
     output_filename = f"generated_{document_type}_{username}_{unique_str}.docx"
     output_path = os.path.join(settings.MEDIA_ROOT, output_filename)
 
-    # Ensure the media directory exists (a fresh server may not have it yet).
-    os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
-
     # Save file
     doc.save(output_path)
 
