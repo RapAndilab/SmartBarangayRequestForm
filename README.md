@@ -3,7 +3,8 @@
 A barangay document-request system with two parts:
 
 - **`BarangayPython/`** — Django REST API backend (the main app). Handles users,
-  document requests, admin approval, email notifications, and document generation.
+  document requests, face verification (DeepFace), admin approval, email
+  notifications, and document generation.
 - **`Barangay_Eforms/`** — PHP web frontend that calls the Django API.
 
 ## Registration flow
@@ -16,10 +17,39 @@ A barangay document-request system with two parts:
 ## Document request flow
 
 1. A logged-in resident fills out a document form (Clearance / Certification / Residency).
-2. The request is created as **Pending** (`confirmed = False`).
-3. An admin reviews it in the Django admin (`/admin/`) and **approves** it.
-4. The resident is emailed and can then **download** the document. Downloads are blocked
+2. They **capture a live photo** with their webcam. On submit it is matched against the
+   profile picture on their account with DeepFace — the request is rejected if it
+   doesn't match. See [Face verification](#face-verification) below.
+3. The request is created as **Pending** (`confirmed = False`).
+4. An admin reviews it in the Django admin (`/admin/`) and **approves** it.
+5. The resident is emailed and can then **download** the document. Downloads are blocked
    (HTTP 403) until the request is approved.
+
+## Face verification
+
+Residents must prove they're themselves before a document request is accepted.
+
+- The check runs **server-side** in `request_document()` — the browser-side capture is
+  only there for UX and can't be used to bypass it.
+- It's **1:1**: the captured photo is compared against *that logged-in user's* profile
+  photo, answering "is this you?" rather than the weaker "is this anybody in the system?".
+- `POST /api/verify_face/` exposes the same check to API clients and returns
+  `{"match": "<full name>", "match_user_id": <id>}`, or `{"match": null}` on no match.
+- DeepFace is **imported lazily**, so TensorFlow only loads on the first face check —
+  `manage.py` commands and dev-server reloads stay fast.
+
+Toggle it with `REQUIRE_FACE_VERIFICATION` (default `True`):
+
+```
+REQUIRE_FACE_VERIFICATION=False   # skip the face check (no webcam / low-memory host)
+```
+
+**Two things to know before enabling it in production:**
+
+1. **A profile photo is required.** Registration makes the photo optional, so any
+   resident without one is blocked from requesting documents until an admin adds one.
+2. **It needs ~2 GB RAM.** TensorFlow won't fit Render's free/starter tiers (512 MB) —
+   see the deployment section.
 
 ## Running the Django backend locally
 
@@ -51,8 +81,12 @@ API to be running at `http://127.0.0.1:8000`.
 ## Deploying to Render
 
 A `render.yaml` blueprint is included at the repo root. It provisions a Postgres
-database and a Python web service running gunicorn — and it runs on Render's **free
-tier** (the app no longer bundles TensorFlow).
+database and a Python web service running gunicorn.
+
+**Plan size:** face verification loads TensorFlow (via `deepface`), which needs roughly
+**2 GB RAM**. Render's free/starter tiers (512 MB) crash with an out-of-memory error, so
+`render.yaml` uses the **standard** plan. To run on the **free tier** instead, set
+`REQUIRE_FACE_VERIFICATION=False` and remove `deepface` from `requirements.txt`.
 
 1. Push this repo to GitHub.
 2. On https://dashboard.render.com → **New +** → **Blueprint**, and select this repo.

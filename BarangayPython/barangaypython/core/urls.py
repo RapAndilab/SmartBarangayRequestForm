@@ -30,6 +30,7 @@ urlpatterns = [
     path('login/', web_views.login_view, name='web_login'),
     path('logout/', web_views.logout_view, name='web_logout'),
     path('request/', web_views.request_document, name='web_request'),
+    path('payment/<int:request_id>/', web_views.payment, name='web_payment'),
 
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),

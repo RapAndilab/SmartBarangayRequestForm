@@ -153,6 +153,90 @@ class GetProfileImageView(views.APIView):
             return Response({"image_url": f"{settings.MEDIA_URL}{user.image.name}"})
         return Response({"error": "No profile image"}, status=status.HTTP_200_OK)
 
+# FACE RECOGNITION
+FACE_MODEL = "VGG-Face"
+
+
+def verify_face_against(image_path, user):
+    """True if the captured image matches this user's profile photo.
+
+    DeepFace is imported lazily: loading TensorFlow costs several seconds and
+    ~1 GB of RAM, and nothing else in the app needs it, so we don't pay that
+    price on every `manage.py` command or dev-server reload.
+    """
+    from deepface import DeepFace
+
+    if not user.image:
+        return False
+    try:
+        result = DeepFace.verify(
+            img1_path=image_path,
+            img2_path=user.image.path,
+            model_name=FACE_MODEL,
+            enforce_detection=True,  # raises if no face is found in either image
+        )
+        return bool(result.get("verified", False))
+    except Exception:
+        # No face detected in one of the images, or the file is unreadable.
+        return False
+
+
+class VerifyFaceView(views.APIView):
+    """Match an uploaded face against stored profile photos.
+
+    Returns {"match": "<full name>"} on success and {"match": None} otherwise,
+    which is the contract the original face_validator.js expected. When the
+    caller is logged in we compare against their own photo only (1:1) instead
+    of scanning every user, so the answer is 'is this you?' rather than the
+    weaker 'is this anybody?'.
+    """
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        uploaded_image = request.FILES.get('captured_face')
+        if not uploaded_image:
+            return Response(
+                {"error": "No captured_face image was provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        temp_path = default_storage.save("temp_uploaded.jpg", uploaded_image)
+        temp_full_path = default_storage.path(temp_path)
+
+        try:
+            user = request.user
+            if user.is_authenticated:
+                if not user.image:
+                    return Response(
+                        {"match": None,
+                         "error": "You have no profile photo on file to match against."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if verify_face_against(temp_full_path, user):
+                    return Response(
+                        {"match": f"{user.first_name} {user.last_name}".strip() or user.username,
+                         "match_user_id": user.id},
+                        status=status.HTTP_200_OK,
+                    )
+                return Response({"match": None}, status=status.HTTP_200_OK)
+
+            # Anonymous caller: fall back to identifying against all users.
+            for candidate in CustomUser.objects.exclude(image=''):
+                if verify_face_against(temp_full_path, candidate):
+                    return Response(
+                        {"match": f"{candidate.first_name} {candidate.last_name}".strip()
+                                  or candidate.username,
+                         "match_user_id": candidate.id},
+                        status=status.HTTP_200_OK,
+                    )
+            return Response({"match": None}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        finally:
+            if os.path.exists(temp_full_path):
+                os.remove(temp_full_path)
+
 # DOCUMENT DOWNLOAD (gated on admin approval)
 class DownloadDocumentView(views.APIView):
     """Serve a generated document file only after the request is approved."""
@@ -176,14 +260,26 @@ class DownloadDocumentView(views.APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not doc_request.download_link:
-            raise Http404("No document available for this request")
+        def resolve(link):
+            # download_link looks like "/media/generated_xxx.docx" -> real path
+            name = os.path.basename(link or "")
+            return name, os.path.join(settings.MEDIA_ROOT, name)
 
-        # download_link looks like "/media/generated_xxx.docx" -> resolve to a real path
-        filename = os.path.basename(doc_request.download_link)
-        file_path = os.path.join(settings.MEDIA_ROOT, filename)
-        if not os.path.exists(file_path):
-            raise Http404("Document file is no longer available")
+        filename, file_path = resolve(doc_request.download_link)
+
+        # Safety net: the request is approved, so a document is owed. If it was never
+        # generated (approval-time failure) or the file has gone (Render's free-tier
+        # disk is wiped on redeploy), rebuild it from the stored form data.
+        if not filename or not os.path.exists(file_path):
+            try:
+                build_document_for(doc_request)
+                doc_request.save(update_fields=["download_link"])
+                filename, file_path = resolve(doc_request.download_link)
+            except Exception as e:
+                print("Document rebuild error:", e)
+
+        if not filename or not os.path.exists(file_path):
+            raise Http404("Document file is not available for this request")
 
         return FileResponse(
             open(file_path, "rb"), as_attachment=True, filename=filename
@@ -195,28 +291,18 @@ class DocumentRequestCreateView(views.APIView):
         data = request.data.copy()
 
         user = CustomUser.objects.get(id=request.data.get("user_id"))
-        try:            
-            def get_day_with_suffix(day: int):
-                if 11 <= day <= 13:
-                    return f"{day}th"
-                else:
-                    return f"{day}{ {1:'st', 2:'nd', 3:'rd'}.get(day % 10, 'th') }"
 
-            # Before calling generate_document_file
-            now = datetime.now()
-
-            data["issued_date_long"] = f"{get_day_with_suffix(now.day)} day of {now.strftime('%B, %Y')}"
-            data["issued_date_short"] = now.strftime("%B %d, %Y")
-
-            download_url = generate_document_file(data)
-        except Exception as e:
-            return Response({"error": f"Document generation failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        # The .docx is generated at approval time, not here — only the request and
+        # the submitted answers are recorded. Issue dates are stamped on approval.
+        form_data = {k: v for k, v in data.items() if isinstance(v, (str, int, float, bool))}
+        form_data.pop("csrfmiddlewaretoken", None)
 
         doc_request = UserDocumentRequest.objects.create(
             user=user,
             document_type=data.get("document_type"),
             full_name=f"{user.first_name} {user.last_name}",
-            download_link=download_url,
+            form_data=form_data,
+            download_link="",
             confirmed=False,
         )
 
@@ -295,8 +381,52 @@ class DocumentProcessRequestView(views.APIView):
         serializer = DocumentRequestSerializer(doc_request)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+def build_document_for(doc_req):
+    """Generate the .docx for a request and store its download link.
+
+    Called at approval time (not when the resident submits), so an unapproved
+    request never has a finished document sitting on disk. Also used to rebuild a
+    file that has gone missing — on Render's free tier the disk is wiped on every
+    redeploy, and the stored form_data is enough to recreate it.
+    """
+    data = dict(doc_req.form_data or {})
+    if not data:
+        # Legacy request from before form_data was stored — fall back to what's
+        # on the model. The template placeholders it can't fill stay as-is.
+        data = {"document_type": doc_req.document_type,
+                "full_name": doc_req.full_name,
+                "username": doc_req.user.username}
+
+    data["document_type"] = doc_req.document_type
+    data["username"] = doc_req.user.username
+    data["full_name"] = doc_req.full_name
+
+    # Stamp the issue date at approval time, so the document carries the date it
+    # was actually issued rather than the date it was requested.
+    now = datetime.now()
+    day = now.day
+    suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    data["issued_date_long"] = f"{day}{suffix} day of {now.strftime('%B, %Y')}"
+    data["issued_date_short"] = now.strftime("%B %d, %Y")
+
+    download_url = generate_document_file(data)
+    doc_req.download_link = download_url
+    return download_url
+
+
 def approve_document_request(doc_req):
-    """Mark a request approved and email the user. Shared by the API and Django admin."""
+    """Approve a request: generate the document, flip the status, email the user.
+
+    The request record itself is kept as-is — only the status changes and the
+    downloadable file becomes ready.
+    """
+    try:
+        build_document_for(doc_req)
+    except Exception as e:
+        # Don't lose the approval if generation fails; the download view will
+        # retry building the file on demand.
+        print("Document generation error on approval:", e)
+
     doc_req.confirmed = True
     doc_req.confirmed_at = timezone.now()
     doc_req.save()

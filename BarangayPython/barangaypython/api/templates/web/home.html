@@ -14,7 +14,7 @@
     {% if requests %}
         <table>
             <thead>
-                <tr><th>ID</th><th>Document</th><th>Status</th><th>Requested</th><th>Download</th></tr>
+                <tr><th>ID</th><th>Document</th><th>Status</th><th>Requested</th><th>Payment</th><th>Download</th></tr>
             </thead>
             <tbody>
                 {% for req in requests %}
@@ -29,11 +29,18 @@
                             {% endif %}
                         </td>
                         <td data-label="Requested">{{ req.requested_at|date:"M d, Y" }}</td>
+                        <td data-label="Payment">
+                            {% if req.payment_screenshot %}
+                                <a href="{% url 'web_payment' req.id %}" title="Replace the screenshot you sent">✅ Sent</a>
+                            {% else %}
+                                <a href="{% url 'web_payment' req.id %}">💳 Upload</a>
+                            {% endif %}
+                        </td>
                         <td data-label="Download">
-                            {% if req.confirmed and req.download_link %}
+                            {% if req.confirmed %}
                                 <a href="{% url 'download_document' req.id %}">📥 Download</a>
                             {% else %}
-                                <span class="muted">—</span>
+                                <span class="muted" title="Your document is prepared once an admin approves the request">Awaiting approval</span>
                             {% endif %}
                         </td>
                     </tr>

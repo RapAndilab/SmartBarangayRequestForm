@@ -45,10 +45,6 @@
             <input type="text" name="username" value="{{ data.username|default:'' }}" required>
         </div>
         <div>
-            <label>Profile Picture (optional)</label>
-            <input type="file" name="image" accept="image/*">
-        </div>
-        <div>
             <label>Password</label>
             <input type="password" name="password" required>
         </div>
@@ -58,8 +54,199 @@
         </div>
     </div>
 
+    <div class="photo-box">
+        <label style="margin-top:0;">Profile Picture</label>
+        <p class="muted" style="margin:0 0 12px;">
+            Used to verify your identity when you request a document. You can upload an
+            existing photo or take one now with your camera.
+        </p>
+
+        <div class="photo-tabs" role="tablist">
+            <button type="button" class="photo-tab is-active" id="tabUpload" role="tab"
+                    aria-selected="true">📁 Upload a file</button>
+            <button type="button" class="photo-tab" id="tabCamera" role="tab"
+                    aria-selected="false">📷 Use camera</button>
+        </div>
+
+        <!-- The single field the form actually submits, fed by either mode. -->
+        <input type="file" name="image" id="image" accept="image/*">
+
+        <div class="photo-pane" id="paneCamera" hidden>
+            <video id="regVideo" playsinline autoplay muted></video>
+            <div class="photo-actions">
+                <button type="button" class="btn btn-sm" id="regStart">Start Camera</button>
+                <button type="button" class="btn btn-sm" id="regCapture" disabled>Capture</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="regRetake" hidden>Retake</button>
+            </div>
+        </div>
+
+        <img id="regPreview" alt="Your profile picture preview">
+        <p class="photo-status muted" id="regStatus">No photo chosen yet (optional).</p>
+    </div>
+
     <button class="btn" type="submit">Register</button>
 </form>
+
+<style>
+    .photo-box {
+        border: 1px solid #d9e2ec; border-radius: 10px; padding: 16px;
+        margin-top: 18px; background: #f8fafc;
+    }
+    .photo-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .photo-tab {
+        flex: 1 1 0; padding: 10px 12px; font-size: 14px; font-family: inherit;
+        border: 1px solid #cbd6e2; background: #fff; color: #0d3b66;
+        border-radius: 8px; cursor: pointer; font-weight: 600;
+    }
+    .photo-tab:hover { background: #eef3f8; }
+    .photo-tab.is-active { background: #0d3b66; color: #fff; border-color: #0d3b66; }
+    .photo-pane { margin-top: 4px; }
+    #regVideo {
+        width: 100%; max-width: 300px; border-radius: 10px; background: #000;
+        display: none; margin: 0 auto;
+    }
+    #regPreview {
+        width: 100%; max-width: 200px; border-radius: 10px; display: none;
+        margin-top: 12px; border: 1px solid #e3e8ee;
+    }
+    .photo-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .photo-actions .btn-sm {
+        width: auto; flex: 1 1 110px; margin-top: 0; padding: 10px 12px; font-size: 14px;
+    }
+    .btn-ghost { background: #fff; color: #0d3b66; border: 1px solid #0d3b66; }
+    .btn-ghost:hover { background: #eef3f8; }
+    .btn:disabled { background: #9bb0c4; cursor: not-allowed; }
+    .photo-status { margin: 10px 0 0; }
+    .photo-status.ok { color: #1e7e34; font-weight: 600; }
+    .photo-status.bad { color: #c0392b; font-weight: 600; }
+    @media (max-width: 560px) {
+        .photo-tabs { flex-direction: column; }
+        .photo-actions .btn-sm { flex: 1 1 100%; }
+    }
+</style>
+<script>
+(function () {
+    const fileInput = document.getElementById("image");
+    const tabUpload = document.getElementById("tabUpload");
+    const tabCamera = document.getElementById("tabCamera");
+    const paneCamera = document.getElementById("paneCamera");
+    const video = document.getElementById("regVideo");
+    const startBtn = document.getElementById("regStart");
+    const captureBtn = document.getElementById("regCapture");
+    const retakeBtn = document.getElementById("regRetake");
+    const preview = document.getElementById("regPreview");
+    const statusEl = document.getElementById("regStatus");
+    let stream = null;
+
+    function setStatus(text, cls) {
+        statusEl.textContent = text;
+        statusEl.className = "photo-status muted" + (cls ? " " + cls : "");
+    }
+
+    function showPreview(src) {
+        preview.src = src;
+        preview.style.display = "block";
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+        video.style.display = "none";
+    }
+
+    // --- mode switching -------------------------------------------------
+    function selectUpload() {
+        tabUpload.classList.add("is-active");
+        tabCamera.classList.remove("is-active");
+        tabUpload.setAttribute("aria-selected", "true");
+        tabCamera.setAttribute("aria-selected", "false");
+        fileInput.hidden = false;
+        paneCamera.hidden = true;
+        stopCamera();
+        captureBtn.disabled = true;
+        startBtn.hidden = false;
+        retakeBtn.hidden = true;
+    }
+
+    function selectCamera() {
+        tabCamera.classList.add("is-active");
+        tabUpload.classList.remove("is-active");
+        tabCamera.setAttribute("aria-selected", "true");
+        tabUpload.setAttribute("aria-selected", "false");
+        fileInput.hidden = true;   // still submitted; just not shown
+        paneCamera.hidden = false;
+        setStatus("Press Start Camera, then Capture.");
+    }
+
+    tabUpload.addEventListener("click", selectUpload);
+    tabCamera.addEventListener("click", selectCamera);
+
+    // --- upload mode ----------------------------------------------------
+    fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+        if (!file) {
+            preview.style.display = "none";
+            setStatus("No photo chosen yet (optional).");
+            return;
+        }
+        showPreview(URL.createObjectURL(file));
+        setStatus("Photo selected: " + file.name, "ok");
+    });
+
+    // --- camera mode ----------------------------------------------------
+    startBtn.addEventListener("click", async function () {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            video.style.display = "block";
+            preview.style.display = "none";
+            captureBtn.disabled = false;
+            startBtn.hidden = true;
+            setStatus("Camera on — line your face up and press Capture.");
+        } catch (err) {
+            setStatus("Couldn't access the camera: " + err.message + " — use Upload a file instead.", "bad");
+        }
+    });
+
+    captureBtn.addEventListener("click", function () {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        // Mirror so the photo matches what the user saw on screen.
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        canvas.toBlob(function (blob) {
+            const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;   // camera photo submits via the same field
+
+            showPreview(URL.createObjectURL(blob));
+            stopCamera();
+            captureBtn.disabled = true;
+            retakeBtn.hidden = false;
+            setStatus("Photo captured.", "ok");
+        }, "image/jpeg", 0.92);
+    });
+
+    retakeBtn.addEventListener("click", function () {
+        preview.style.display = "none";
+        fileInput.value = "";
+        retakeBtn.hidden = true;
+        startBtn.hidden = false;
+        setStatus("Press Start Camera, then Capture.");
+    });
+
+    window.addEventListener("pagehide", stopCamera);
+    selectUpload();
+})();
+</script>
 <p class="muted" style="text-align:center; margin-top:16px;">
     Already have an account? <a href="{% url 'web_login' %}">Login here</a>
 </p>

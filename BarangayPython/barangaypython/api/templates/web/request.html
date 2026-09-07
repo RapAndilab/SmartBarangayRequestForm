@@ -2,7 +2,7 @@
 {% block title %}Request a Document - Barangay E-Form{% endblock %}
 {% block content %}
 <h1>Request a Document</h1>
-<form method="POST">
+<form method="POST" enctype="multipart/form-data" id="docForm">
     {% csrf_token %}
     <label>Document Type</label>
     <select name="document_type" required>
@@ -43,9 +43,146 @@
     <label>Years of Residency (if applicable)</label>
     <input type="text" name="years" value="{{ data.years|default:'' }}" placeholder="e.g. 5">
 
-    <button class="btn" type="submit">Submit Request</button>
+    {% if require_face %}
+    <div class="face-box" id="faceBox">
+        <label style="margin-top:0;">Face Verification</label>
+        <p class="muted" style="margin:0 0 10px;">
+            Capture a live photo so we can confirm it's really you. It's matched
+            against the profile picture on your account.
+        </p>
+
+        <video id="video" playsinline autoplay muted></video>
+        <img id="facePreview" alt="Captured face preview">
+        <input type="file" name="captured_face" id="captured_face" accept="image/*" hidden>
+
+        <div class="face-actions">
+            <button type="button" class="btn btn-sm" id="startBtn">Start Camera</button>
+            <button type="button" class="btn btn-sm" id="captureBtn" disabled>Capture</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="retakeBtn" hidden>Retake</button>
+        </div>
+        <p class="face-status muted" id="faceStatus">Camera is off.</p>
+    </div>
+    {% endif %}
+
+    <button class="btn" type="submit" id="submitBtn">Submit Request</button>
 </form>
 <p class="muted" style="text-align:center; margin-top:14px;">
     Your request will be reviewed by an admin before you can download the document.
 </p>
+
+{% if require_face %}
+<style>
+    .face-box {
+        border: 1px solid #d9e2ec; border-radius: 10px; padding: 16px;
+        margin-top: 18px; background: #f8fafc;
+    }
+    .face-box video, .face-box img {
+        width: 100%; max-width: 320px; border-radius: 10px; background: #000;
+        display: none; margin: 0 auto;
+    }
+    .face-actions {
+        display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .face-actions .btn-sm {
+        width: auto; flex: 1 1 120px; margin-top: 0; padding: 10px 14px; font-size: 14px;
+    }
+    .btn-ghost { background: #fff; color: #0d3b66; border: 1px solid #0d3b66; }
+    .btn-ghost:hover { background: #eef3f8; }
+    .btn:disabled { background: #9bb0c4; cursor: not-allowed; }
+    .face-status { margin: 10px 0 0; }
+    .face-status.ok { color: #1e7e34; font-weight: 600; }
+    .face-status.bad { color: #c0392b; font-weight: 600; }
+    @media (max-width: 560px) { .face-actions .btn-sm { flex: 1 1 100%; } }
+</style>
+<script>
+(function () {
+    const video = document.getElementById("video");
+    const preview = document.getElementById("facePreview");
+    const fileInput = document.getElementById("captured_face");
+    const startBtn = document.getElementById("startBtn");
+    const captureBtn = document.getElementById("captureBtn");
+    const retakeBtn = document.getElementById("retakeBtn");
+    const statusEl = document.getElementById("faceStatus");
+    const submitBtn = document.getElementById("submitBtn");
+    let stream = null;
+
+    function setStatus(text, cls) {
+        statusEl.textContent = text;
+        statusEl.className = "face-status muted" + (cls ? " " + cls : "");
+    }
+
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            video.srcObject = stream;
+            video.style.display = "block";
+            preview.style.display = "none";
+            captureBtn.disabled = false;
+            startBtn.hidden = true;
+            setStatus("Camera on — line your face up and press Capture.");
+        } catch (err) {
+            setStatus("Couldn't access the camera: " + err.message, "bad");
+        }
+    }
+
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+        video.style.display = "none";
+    }
+
+    function capture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        // Mirror, so the saved shot matches what the user saw on screen.
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        canvas.toBlob(function (blob) {
+            const file = new File([blob], "captured_face.jpg", { type: "image/jpeg" });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+
+            preview.src = URL.createObjectURL(blob);
+            preview.style.display = "block";
+            stopCamera();
+            captureBtn.disabled = true;
+            retakeBtn.hidden = false;
+            setStatus("Photo captured. Submit the form to verify and send your request.", "ok");
+        }, "image/jpeg", 0.92);
+    }
+
+    function retake() {
+        preview.style.display = "none";
+        fileInput.value = "";
+        retakeBtn.hidden = true;
+        startCamera();
+    }
+
+    startBtn.addEventListener("click", startCamera);
+    captureBtn.addEventListener("click", capture);
+    retakeBtn.addEventListener("click", retake);
+
+    document.getElementById("docForm").addEventListener("submit", function (e) {
+        if (!fileInput.files.length) {
+            e.preventDefault();
+            setStatus("Please capture your face before submitting.", "bad");
+            document.getElementById("faceBox").scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Verifying your face…";
+    });
+
+    window.addEventListener("pagehide", stopCamera);
+})();
+</script>
+{% endif %}
 {% endblock %}

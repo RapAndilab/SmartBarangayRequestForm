@@ -10,7 +10,11 @@ services:
   - type: web
     name: smartbarangay
     runtime: python
-    plan: free
+    # Face verification loads TensorFlow (via deepface), which needs ~2 GB RAM.
+    # The free/starter tiers (512 MB) will crash with OOM, so "standard" is the
+    # smallest plan that can run it. To go back to the free tier, set
+    # REQUIRE_FACE_VERIFICATION=False and drop deepface from requirements.txt.
+    plan: standard
     rootDir: BarangayPython/barangaypython
     # ensure_admin creates/updates the admin from DJANGO_SUPERUSER_* env vars on every
     # deploy (idempotent — also resets the password, so the login state is predictable).
@@ -31,6 +35,9 @@ services:
         value: ".onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://*.onrender.com"
+      # Face verification on document requests (requires the standard plan above).
+      - key: REQUIRE_FACE_VERIFICATION
+        value: "True"
       # Secrets below are NOT committed — set their values in the Render dashboard
       # (Environment tab) after the first deploy. sync:false keeps them blank here.
       - key: BASE_URL

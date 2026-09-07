@@ -189,6 +189,11 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '')
 # is configured to require email confirmation again.
 EMAIL_VERIFICATION_ENABLED = os.environ.get('EMAIL_VERIFICATION_ENABLED', 'False') == 'True'
 
+# DeepFace face verification on document requests. Needs a webcam in the browser
+# and ~2 GB RAM on the server (TensorFlow). Set REQUIRE_FACE_VERIFICATION=False to
+# turn it off (e.g. on a machine with no camera, or a memory-limited host).
+REQUIRE_FACE_VERIFICATION = os.environ.get('REQUIRE_FACE_VERIFICATION', 'True') == 'True'
+
 # Auth redirects for the server-rendered resident site
 LOGIN_URL = 'web_login'
 LOGIN_REDIRECT_URL = 'web_home'
